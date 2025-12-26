@@ -1,0 +1,6 @@
+__pycache__/
+
+venv/
+models/
+application/run.py
+test.txt 

@@ -1,0 +1,9 @@
+sentence-transformers==5.2.0
+transformers==4.57.3
+torch==2.9.1
+kneed==0.8.5
+py_vncorenlp==0.1.4
+protobuf==6.33.2
+peft==0.18.0
+python-dotenv==1.2.1
+streamlit==1.52.2
