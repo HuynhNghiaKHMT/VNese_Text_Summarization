@@ -5,20 +5,21 @@ from sentence_transformers import SentenceTransformer
 from summary.kmean import kmeans_summarizer
 from summary.lexrank import lexrank_summarizer
 from utils.split_sentence import split_sentence
-from summary.mbart50_fb import experiment
+from summary.mbart50_fb import mbart_summarizer, load_mbart
+from summary.bartpho_vinai import bartpho_summarizer, load_bartpho
 
 # --- LOAD CẤU HÌNH TỪ FILE .ENV ---
 load_dotenv()
 
 # Lấy các đường dẫn model (nếu không tìm thấy sẽ dùng giá trị mặc định)
-SBERT_FINETUNE = os.getenv("sbert_model_finetune", "models/multilingual-e5-large-finetuned")
-SBERT_BASE = os.getenv("sbert_model_base", "intfloat/multilingual-e5-large")
+SBERT_FINETUNE = os.getenv("sbert_model_finetune")
+SBERT_BASE = os.getenv("sbert_model_base")
 
-MBART_FINETUNE = os.getenv("mbart_model_finetune", "models/mbart-transformers-default-v1")
-MBART_BASE = os.getenv("mbart_model_base", "facebook/mbart-large-50")
+MBART_FINETUNE = os.getenv("mbart_model_finetune")
+MBART_BASE = os.getenv("mbart_model_base")
 
-BARTPHO_FINETUNE = os.getenv("bartpho_model_finetune", "models/bartpho-transformers-default-v1")
-BARTPHO_BASE = os.getenv("bartpho_model_base", "vinai/bartpho-word")
+BARTPHO_FINETUNE = os.getenv("bartpho_model_finetune")
+BARTPHO_BASE = os.getenv("bartpho_model_base")
 
 # 1. Cấu hình trang
 st.set_page_config(layout="wide", page_title="Vietnamese Text Summarization")
@@ -91,16 +92,6 @@ if 'processed' not in st.session_state:
     st.session_state.extractive_res = ""
     st.session_state.abstractive_res = ""
 
-@st.cache_resource
-def load_models():
-    try:
-        return SentenceTransformer(SBERT_FINETUNE)
-    except:
-        return SentenceTransformer(SBERT_BASE)
-
-sbert_model = load_models()
-
-
 # --- SIDEBAR CẤU HÌNH ---
 st.sidebar.header("⚙️ Cấu hình")
 st.sidebar.markdown("---")
@@ -110,11 +101,11 @@ do_extractive = st.sidebar.checkbox("Tóm tắt trích xuất (Extractive)", val
 do_abstractive = st.sidebar.checkbox("Tóm tắt trừu tượng (Abstractive)", value=False)
 
 st.sidebar.markdown("---")
-extractive_method = st.sidebar.radio("Phương pháp trích đoạn:", ["K-Means", "LexRank"])
-extraction_ratio = st.sidebar.slider("Tỷ lệ trích xuất (%)", 5, 100, 20, step=10) / 100
+extractive_method = st.sidebar.radio("Tóm tắt trích đoạn:", ["K-Means", "LexRank"])
+extraction_ratio = st.sidebar.slider("Tỷ lệ trích đoạn (%)", 5, 50, 10, step=5) / 100
 
 # st.sidebar.markdown("---")
-abstractive_method = st.sidebar.radio("Phương pháp trừu tượng:", ["fb/mbart50", "vinai/bartpho"])
+abstractive_method = st.sidebar.radio("Tóm tắt trừu tượng:", ["fb/mbart50", "vinai/bartpho"])
 
 st.sidebar.markdown("---")
 # Nút Reset chiếm hết chiều ngang và chữ nằm giữa
@@ -124,6 +115,33 @@ if st.sidebar.button("🔄 Reset", use_container_width=True):
     st.session_state.extractive_res = ""
     st.session_state.abstractive_res = ""
     st.rerun()
+
+# --- LOAD MÔ HÌNH ---
+@st.cache_resource
+def load_sbert_models():
+    try:
+        return SentenceTransformer(SBERT_FINETUNE)
+    except:
+        return SentenceTransformer(SBERT_BASE)
+
+sbert_model = load_sbert_models()
+
+@st.cache_resource
+def load_mbart_models():
+    try:
+        return load_mbart(MBART_BASE, MBART_FINETUNE)
+    except:
+        return None, None, None
+
+@st.cache_resource
+def load_bartpho_models():
+    try:
+        return load_bartpho(BARTPHO_BASE,BARTPHO_FINETUNE)
+    except:
+        return None, None, None
+    
+MODEL1, TOKENIZER1, DEVICE1 = load_mbart_models()
+MODEL2, TOKENIZER2, DEVICE2 = load_bartpho_models()
 
 # --- GIAO DIỆN CHÍNH ---
 st.markdown('<h1 class="main-title">Vietnamese Text Summarization System</h1>', unsafe_allow_html=True)
@@ -191,9 +209,9 @@ if summarize_btn and not st.session_state.processed:
             embeddings = sbert_model.encode(sentences)
             print("--- Đang thực hiện Extractive Summarization ---")
             if extractive_method == "K-Means":
-                indices, summaries = kmeans_summarizer(sentences, embeddings)
+                indices, summaries = kmeans_summarizer(sentences, embeddings, extraction_ratio)
             else:
-                indices, summaries = lexrank_summarizer(sentences, embeddings, extraction_ratio=extraction_ratio)
+                indices, summaries = lexrank_summarizer(sentences, embeddings, extraction_ratio)
             st.session_state.extractive_res = " ".join(summaries)
             print("--- Hoàn thành Extractive Summarization ---")
             
@@ -208,12 +226,21 @@ if summarize_btn and not st.session_state.processed:
             if do_extractive:
                 # Chế độ Hybrid: Dùng kết quả extractive làm đầu vào
                 print("--- Đang thực hiện Hybrid Summarization ---")
-                st.session_state.abstractive_res = experiment(MBART_BASE, MBART_FINETUNE, st.session_state.extractive_res)
+                
+                if abstractive_method == "fb/mbart50":
+                    st.session_state.abstractive_res = mbart_summarizer(MODEL1, TOKENIZER1, DEVICE1, st.session_state.extractive_res)
+                else:
+                    st.session_state.abstractive_res = bartpho_summarizer(MODEL2, TOKENIZER2, DEVICE2, st.session_state.extractive_res)
+                
                 print("--- Hoàn thành Hybrid Summarization ---")
             else:
                 # Chế độ Abstractive thuần túy
                 print("--- Đang thực hiện Abstractive Summarization ---")
-                st.session_state.abstractive_res = experiment(MBART_BASE, MBART_FINETUNE, input_text)
+                if abstractive_method == "fb/mbart50":
+                    st.session_state.abstractive_res = mbart_summarizer(MODEL1, TOKENIZER1, DEVICE1, input_text)
+                else:
+                    st.session_state.abstractive_res = bartpho_summarizer(MODEL2, TOKENIZER2, DEVICE2, input_text)
+
                 print("--- Hoàn thành Abstractive Summarization ---")
             
             ab_placeholder.success("✅ Đã hoàn thành trừu tượng!")

@@ -1,7 +1,8 @@
-from sklearn.cluster import KMeans
-from kneed import KneeLocator
-from sklearn.metrics import pairwise_distances_argmin_min
 import math
+import numpy as np
+from kneed import KneeLocator
+from sklearn.cluster import KMeans
+from sklearn.metrics import pairwise_distances_argmin_min, pairwise_distances
 
 def find_optimal_k(embeddings, num_sentences):
     """
@@ -11,8 +12,8 @@ def find_optimal_k(embeddings, num_sentences):
 
     # 1. Tính toán biên giới hạn cho K
     # Sử dụng math.ceil để đảm bảo luôn lấy ít nhất 1 câu
-    min_k = max(2, math.ceil(num_sentences * 0.2))
-    max_k = max(2, math.ceil(num_sentences * 0.5))
+    min_k = max(1, math.ceil(num_sentences * 0.2))
+    max_k = max(1, math.ceil(num_sentences * 0.5))
     
     # Trường hợp đặc biệt: Tài liệu quá ngắn
     if num_sentences <= 2:
@@ -48,13 +49,10 @@ def find_optimal_k(embeddings, num_sentences):
     
     return final_k
 
-def kmeans_summarizer(sentences, embeddings):
+def kmeans_summarizer(sentences, embeddings, extraction_ratio=0.2):
 
     # BƯỚC 1: TÌM K TỐI ƯU (ELBOW)
-    if len(sentences) > 3:
-        k_optimal = find_optimal_k(embeddings, min(len(sentences) - 1, 10))
-    else:
-        k_optimal = 1
+    k_optimal = find_optimal_k(embeddings, len(sentences))
 
     # BƯỚC 2: PHÂN CỤM VÀ TRÍCH XUẤT
     # Tận dụng logic tìm câu gần tâm cụm nhất
@@ -64,15 +62,34 @@ def kmeans_summarizer(sentences, embeddings):
     
     selected_indices = []
     for i in range(k_optimal):
+
+        # Cách 1: Tìm câu gần tâm cụm nhất
         # Lấy chỉ số các câu thuộc cụm i
-        cluster_indices = [idx for idx, label in enumerate(kmeans.labels_) if label == i]
-        cluster_embs = embeddings[cluster_indices]
+        # cluster_indices = [idx for idx, label in enumerate(kmeans.labels_) if label == i]
+        # cluster_embs = embeddings[cluster_indices]
         
         # Tìm câu gần tâm nhất trong cụm đó
-        closest, _ = pairwise_distances_argmin_min(centroids[i].reshape(1, -1), cluster_embs)
-        selected_indices.append(cluster_indices[closest[0]])
+        # closest, _ = pairwise_distances_argmin_min(centroids[i].reshape(1, -1), cluster_embs)
+        # selected_indices.append(cluster_indices[closest[0]])
+
+        # Cách 2: Lấy phần trăm câu theo extraction_ratio trong mỗi cụm
+        cluster_indices = np.where(kmeans.labels_ == i)[0]
+        cluster_embs = embeddings[cluster_indices]
+        
+        # 2. Số câu cần trích xuất trong cụm này
+        num_to_extract = max(1, math.ceil(len(cluster_indices) * extraction_ratio))
+        
+        # 3. Tính khoảng cách từ tâm đến TẤT CẢ các câu trong cụm\, distances có dạng (1, len(cluster_indices))
+        distances = pairwise_distances(centroids[i].reshape(1, -1), cluster_embs, metric='euclidean').flatten()
+        
+        # 4. Sắp xếp lấy num_to_extract câu gần tâm nhất
+        closest_indices_in_cluster = np.argsort(distances)[:num_to_extract]
+        
+        # 5. Đưa các chỉ số gốc vào danh sách chọn
+        for idx in closest_indices_in_cluster:
+            selected_indices.append(cluster_indices[idx])
     
-    # BƯỚC : Sắp xếp lại theo thứ tự xuất hiện gốc
+    # BƯỚC3: Sắp xếp lại theo thứ tự xuất hiện gốc
     selected_indices.sort()
     # final_summary = " ".join([sentences[idx] for idx in selected_indices])
     final_summary = [sentences[idx] for idx in selected_indices]

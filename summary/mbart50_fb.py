@@ -3,13 +3,38 @@ import torch
 from peft import PeftModel
 from transformers import MBartForConditionalGeneration, MBart50TokenizerFast
 
-# def preprocessing(extractive, flag=False):
-#     # Đảm bảo đầu vào là String để tokenizer xử lý được
-#     if isinstance(extractive, list):
-#         return " ".join(extractive)
-#     return extractive
+def load_mbart(base_model, adapter_path=None):
+    """
+    Hàm này chỉ gọi 1 lần duy nhất để đưa mô hình lên GPU.
+    """
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    print(f"--- Đang khởi tạo mô hình trên: {device} ---")
+    
+    try:
+        # 1. Load Tokenizer
+        tokenizer = MBart50TokenizerFast.from_pretrained(base_model, src_lang="vi_VN", tgt_lang="vi_VN")
+        
+        # 2. Load Base Model
+        base = MBartForConditionalGeneration.from_pretrained(base_model)
+        
+        # 3. Load Adapter nếu có
+        if adapter_path and os.path.exists(adapter_path):
+            print(f"--- Đang nạp Adapter từ: {adapter_path} ---")
+            model = PeftModel.from_pretrained(base, adapter_path)
+        else:
+            print("--- Không tìm thấy Adapter, sử dụng Base Model ---")
+            model = base
+            
+        model = model.to(device)
+        model.eval() # Chuyển sang chế độ đánh giá
+        
+        return model, tokenizer, device
 
-def chunk_text(text, chunk_size=1022, overlap=128, tokenizer=None):
+    except Exception as e:
+        print(f"[LỖI KHI LOAD MODEL]: {e}")
+        return None, None, None
+    
+def chunk_text(text, chunk_size=1024, overlap=128, tokenizer=None):
     if not tokenizer:
         return [text]
     
@@ -28,38 +53,12 @@ def chunk_text(text, chunk_size=1022, overlap=128, tokenizer=None):
             
     return chunks if chunks else [text]
 
-def experiment(base_model, model_path, extractive):
+def mbart_summarizer(model, tokenizer, device, extractive_text):
     
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-    try:
-        # 1. Load Tokenizer từ model gốc
-        tokenizer = MBart50TokenizerFast.from_pretrained(base_model, src_lang="vi_VN", tgt_lang="vi_VN")
-        
-        # 2. Load Base Model gốc
-        base_model = MBartForConditionalGeneration.from_pretrained(base_model)
-        
-        # 3. Load Adapter (cái mà bạn đã train) đè lên Base Model
-        if model_path and os.path.exists(model_path):
-            print(f"Đang nạp Adapter từ: {model_path}")
-            model = PeftModel.from_pretrained(base_model, model_path)
-        else:
-            model = base_model
-            
-        model = model.to(device)
-    except Exception as e:
-        print(f"\n[LỖI NGHIÊM TRỌNG]: {e}")
-        return "Lỗi: Không thể khởi tạo mô hình."
-    
-    # 4. Tiền xử lý dữ liệu (Chuyển List từ K-Means thành String)
-    # extractive_text = preprocessing(extractive, False)
-    extractive_text = extractive
-
-    # 5. Chia chunk và tóm tắt
+    # 4. Chia chunk và tóm tắt
     chunks = chunk_text(extractive_text, tokenizer=tokenizer)
     abstractive_summary = []
     
-    model.eval()
     with torch.no_grad():
         for chunk in chunks:
             inputs = tokenizer(

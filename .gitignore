@@ -1,6 +1,9 @@
 __pycache__/
 
 venv/
-models/
+assets/demo.mp4
+models/bartpho-transformers-default-v1/
+models/mbart-transformers-default-v1/
+models/mtlge5-transformers-default-v1/
 application/run.py
 test.txt 

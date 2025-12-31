@@ -1,11 +1,11 @@
 # CS221 - Vietnamese Text Summarization  (Streamlit)
-Dự án này triển khai một **Hệ thống tóm tắt văn bản tiếng Viêt**, sử dụng Streamlit làm giao diện tương tác. Hệ thống kết hợp khả năng trích xuất trích đoạn (extractive) và trích xuất trừu tượng (abstractive) *, đồng thời tối ưu hóa trích xuất thông tin bằng các kỹ thuật như **TF-IDF**, **BM25** và **Vector Search**. Mục tiêu là cung cấp các bản tóm tắt chính xác và ngắn gọn từ các văn bản tiếng Việt dài, hỗ trợ người dùng trong việc nắm bắt thông tin nhanh chóng và hiệu quả.
+Dự án này triển khai một **Hệ thống tóm tắt văn bản tiếng Việt**, sử dụng Streamlit làm giao diện tương tác. Hệ thống kết hợp khả năng trích xuất trích đoạn (extractive) và trích xuất trừu tượng (abstractive), đồng thời tối ưu hóa trích xuất thông tin bằng các kỹ thuật như **TF-IDF**, **BM25** và **Vector Search**. Mục tiêu là cung cấp các bản tóm tắt chính xác và ngắn gọn từ các văn bản tiếng Việt dài, hỗ trợ người dùng trong việc nắm bắt thông tin nhanh chóng và hiệu quả.
 
 ## 📦 Công nghệ và Thư viện sử dụng
 
 - **Dataset**: `OpenHust` tại [Huggingface](https://huggingface.co/datasets/OpenHust/vietnamese-summarization)
-- **Embedding Model**: `multilingual-e5-large` (mô hình [finetune](https://huggingface.co/intfloat/multilingual-e5-large)) để tạo vector ngữ nghĩa cho các câu trong đoạn văn bản.
-- **Extractive summarization model**: `LexRank` và `Kmeans` để trích xuất các câu quan trọng từ đoạn văn bản gốc.
+- **Embedding Model**: `multilingual-e5-large` (mô hình [finetune](https://huggingface.co/intfloat/multilingual-e5-large)) để tạo vector ngữ nghĩa cho các câu trong đoạn văn bản gốc.
+- **Extractive summarization model**: `LexRank Algorithm` và `Kmeans Algorithm` để trích xuất các câu quan trọng từ đoạn văn bản gốc.
 - **Abstractive summarization model**: `mbart-large-50` (mô hình [finetune](https://huggingface.co/facebook/mbart-large-50)) và `bartpho-word` (mô hình [finetune](https://huggingface.co/vinai/bartpho-word)) để tạo tóm tắt trừu tượng cho các đoạn văn bản.
 - **Apllication**: `Streamlit` để cung cấp một ứng dụng tương tác.
 

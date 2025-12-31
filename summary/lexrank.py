@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from utils.split_sentence import split_sentence
 
 def pagerank(graph_matrix, d=0.85, max_iter=100, tol=1e-4):
     N = graph_matrix.shape[0]
